@@ -122,7 +122,7 @@ Praca.
 Oprogramowanie.
 
 > Kasperek, M. M. (2026). *Air-rescue civil-military integration models*
-> (wersja 1.0.0) [Software]. Zenodo. https://doi.org/10.5281/zenodo.[numer]
+> (wersja 1.0.0) [Software]. Zenodo. https://doi.org/10.5281/zenodo.20734498
 
 ## Autor
 
