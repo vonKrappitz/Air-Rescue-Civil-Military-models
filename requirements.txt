@@ -1,0 +1,10 @@
+# Runtime dependencies for the two models: none.
+# economic_model.py and reserve_placement.py use only the Python standard
+# library (math, itertools, json, os) and run on Python 3.8 or newer.
+
+# The figure script figure_a2_1.py additionally needs:
+matplotlib>=3.5
+numpy>=1.20
+
+# Testing:
+pytest>=7.0
