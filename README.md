@@ -3,7 +3,7 @@
 Computational supplement to the study
 
 > M. M. Kasperek (2026). *Civil-military integration of a reformed national
-> air-rescue network.* Defence and Peace Economics (preprint).
+> air-rescue network.* (preprint).
 
 This repository holds the two deterministic models that regenerate the figures
 of the paper. Running them reproduces every quantitative result of Appendix 1
@@ -118,7 +118,7 @@ If you use this software, please cite both the paper and the software record.
 Paper:
 
 > Kasperek, M. M. (2026). Civil-military integration of a reformed national
-> air-rescue network. *Defence and Peace Economics* (preprint).
+> air-rescue network. (preprint).
 
 Software:
 
