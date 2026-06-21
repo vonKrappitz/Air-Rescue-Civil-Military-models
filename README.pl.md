@@ -3,7 +3,7 @@
 Suplement obliczeniowy do pracy.
 
 > M. M. Kasperek (2026). *Civil-military integration of a reformed national
-> air-rescue network.* Defence and Peace Economics (preprint).
+> air-rescue network.* (preprint).
 
 Repozytorium zawiera dwa deterministyczne modele, które regenerują ryciny pracy.
 Ich uruchomienie odtwarza każdy wynik liczbowy z Appendiksu 1 i Appendiksu 2 co
@@ -117,7 +117,7 @@ Jeśli korzystasz z tego oprogramowania, cytuj pracę i rekord oprogramowania.
 Praca.
 
 > Kasperek, M. M. (2026). Civil-military integration of a reformed national
-> air-rescue network. *Defence and Peace Economics* (preprint).
+> air-rescue network. (preprint).
 
 Oprogramowanie.
 
