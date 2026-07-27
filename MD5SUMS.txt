@@ -7,11 +7,11 @@ bb743f1481d02c514ef486c3ab0ac7d1  reserve_placement.py
 2a8fac5cffd52c915fa17bf1c9026c67  poland_voivodeships.geojson
 6a871ac466aa136aaa7c798c546e6ce1  figure_A2_1.png
 5a6a8411c9f448c80d1cf37b92df1fb6  figure_zones.png
-9c1d7732b85e40ae1485bb936f709530  LICENSE.md
-02ef52ac63bf65b7544e5e6c79cb82a8  NOTICE.md
-8cc3b141e10be684da762f5aeb69f3bf  README.md
-7a491c6249f27ab315a95e52e98a102d  README.pl.md
+0ce15228b5baa53d8cf11b12233c59d4  NOTICE.md
+ad667db8faa6156d36c0ddcb9931d45a  README.md
+119d236f83f2f2b12e459c7f2c80e49b  README.pl.md
 46855851c4c63699882f69c23f58cf3e  CITATION.cff
+44b675d11d8f457aa3ec7f94b398a75b  LICENSE
 43b68a5f55b569f08bdcab8e4d190e38  requirements.txt
 4b085aabec9bf3053bd2abf811810e58  tests/test_economic_model.py
 16d2f301f6cb70bd37557d612aeb1c0b  tests/test_reserve_placement.py

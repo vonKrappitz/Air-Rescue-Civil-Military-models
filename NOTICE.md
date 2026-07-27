@@ -1,5 +1,7 @@
 # Attribution notice
 
+Copyright 2026 Maciej M. Kasperek. Code licensed under the Apache License, Version 2.0; see `LICENSE`.
+
 ## Boundary data
 
 `poland_boundary.geojson` (ADM0) and `poland_voivodeships.geojson` (ADM1) are the

@@ -11,7 +11,7 @@ Computational supplement to:
 
 Author: **Maciej M. Kasperek**, ORCID [0009-0008-7419-0851](https://orcid.org/0009-0008-7419-0851).
 
-Code licensed under Apache 2.0 (`LICENSE.md`).
+Code licensed under Apache 2.0 (`LICENSE`).
 Boundary data from **geoBoundaries** (<https://www.geoboundaries.org>), used under CC BY 4.0. See `NOTICE.md`.
 
 This package reproduces every number, table and figure in the article from source.
@@ -28,7 +28,7 @@ The Polish-language version of this README is in `README.pl.md`.
 - `poland_boundary.geojson`, `poland_voivodeships.geojson` — national (ADM0) and voivodeship (ADM1) boundaries of Poland from the geoBoundaries open database, redistributed unmodified under CC BY 4.0. See `NOTICE.md`.
 - `tests/` — 37 unit tests that lock every headline value.
 - `requirements.txt` — Python dependencies.
-- `LICENSE.md`, `NOTICE.md` — licence of this code and attribution for the redistributed boundary data.
+- `LICENSE`, `NOTICE.md` — full Apache 2.0 licence text and attribution and attribution for the redistributed boundary data.
 - `.gitattributes` — keeps line endings stable so the checksums in `MD5SUMS.txt` verify on every platform.
 - `.gitignore` — keeps local caches (`__pycache__`, `.pytest_cache`) and generated output out of the repository.
 

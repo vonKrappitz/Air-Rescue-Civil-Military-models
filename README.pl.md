@@ -11,7 +11,7 @@ Uzupełnienie obliczeniowe do pracy:
 
 Autor: **Maciej M. Kasperek**, ORCID [0009-0008-7419-0851](https://orcid.org/0009-0008-7419-0851).
 
-Kod na licencji Apache 2.0 (`LICENSE.md`).
+Kod na licencji Apache 2.0 (`LICENSE`).
 Dane granic pochodzą z **geoBoundaries** (<https://www.geoboundaries.org>) i są
 wykorzystywane na licencji CC BY 4.0. Szczegóły w `NOTICE.md`.
 
@@ -29,7 +29,7 @@ Angielska wersja tego pliku znajduje się w `README.md`.
 - `poland_boundary.geojson`, `poland_voivodeships.geojson` — granica państwa (ADM0) i granice województw (ADM1) z otwartej bazy geoBoundaries, rozpowszechniane bez zmian na licencji CC BY 4.0. Szczegóły w `NOTICE.md`.
 - `tests/` — 37 testów jednostkowych zamrażających każdą kluczową liczbę.
 - `requirements.txt` — zależności Pythona.
-- `LICENSE.md`, `NOTICE.md` — licencja kodu oraz atrybucja rozpowszechnianych danych granic.
+- `LICENSE`, `NOTICE.md` — pełny tekst licencji Apache 2.0 oraz atrybucja rozpowszechnianych danych granic.
 - `.gitattributes` — utrzymuje stałe końce linii, dzięki czemu sumy kontrolne z `MD5SUMS.txt` zgadzają się na każdej platformie.
 - `.gitignore` — trzyma lokalne katalogi podręczne (`__pycache__`, `.pytest_cache`) i pliki generowane poza repozytorium.
 
