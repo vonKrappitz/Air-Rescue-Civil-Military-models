@@ -9,9 +9,9 @@ bb743f1481d02c514ef486c3ab0ac7d1  reserve_placement.py
 5a6a8411c9f448c80d1cf37b92df1fb6  figure_zones.png
 9c1d7732b85e40ae1485bb936f709530  LICENSE.md
 02ef52ac63bf65b7544e5e6c79cb82a8  NOTICE.md
-c35e1c7adac9e4bd0008e03288a4c321  README.md
-c3faf21e889ac03da4c307d6e9d4bdfd  README.pl.md
-ddb2205f3158ca4d410a25cb88e6f271  CITATION.cff
+8cc3b141e10be684da762f5aeb69f3bf  README.md
+7a491c6249f27ab315a95e52e98a102d  README.pl.md
+46855851c4c63699882f69c23f58cf3e  CITATION.cff
 43b68a5f55b569f08bdcab8e4d190e38  requirements.txt
 4b085aabec9bf3053bd2abf811810e58  tests/test_economic_model.py
 16d2f301f6cb70bd37557d612aeb1c0b  tests/test_reserve_placement.py

@@ -1,5 +1,7 @@
 # Modele integracji cywilno-wojskowej ratownictwa lotniczego
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20734497.svg)](https://doi.org/10.5281/zenodo.20734497)
+
 **Wersja 2.0.0**
 
 Uzupełnienie obliczeniowe do pracy:
@@ -60,7 +62,7 @@ Praca:
 
 Oprogramowanie:
 > Kasperek, M. M. (2026). *Air-rescue civil-military integration models*
-> (wersja 2.0.0) [Oprogramowanie].
+> (wersja 2.0.0) [Oprogramowanie]. Zenodo. https://doi.org/10.5281/zenodo.21632716
 
 ## Autor
 

@@ -16,6 +16,9 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.21632716
     description: "Version DOI for release 2.0.0"
+  - type: doi
+    value: 10.5281/zenodo.20734497
+    description: "Concept DOI, always resolves to the latest version"
 keywords:
   - defence economics
   - public-private partnership

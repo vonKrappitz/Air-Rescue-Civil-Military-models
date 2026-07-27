@@ -1,5 +1,7 @@
 # Air-rescue civil-military integration models
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20734497.svg)](https://doi.org/10.5281/zenodo.20734497)
+
 **Version 2.0.0**
 
 Computational supplement to:
@@ -59,7 +61,7 @@ Paper:
 
 Software:
 > Kasperek, M. M. (2026). *Air-rescue civil-military integration models*
-> (version 2.0.0) [Software].
+> (version 2.0.0) [Software]. Zenodo. https://doi.org/10.5281/zenodo.21632716
 
 ## Author
 
