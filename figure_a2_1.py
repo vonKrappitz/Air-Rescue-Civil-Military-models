@@ -27,6 +27,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 
 import reserve_placement as rp
@@ -40,12 +41,13 @@ CITY_LABELS = {
 }
 RESIDUAL = {"Klodzko": (50.10, 16.55), "Bieszczady": (49.01, 22.88)}
 
-# Palette tuned to the manuscript figure
-CIVIL_COLOR = "#16335f"      # navy
-NAVY_COLOR = "#8e1a8e"       # purple
-BORDER_COLOR = "#6f7785"     # voivodeship lines
-OUTLINE_COLOR = "#2a2f38"    # national outline
-CMAP = "RdYlGn_r"
+# Greyscale palette for print. Reach is a light-to-dark grey ramp and the
+# markers are distinguished by shape, so the map reads in black and white.
+CIVIL_COLOR = "#111111"      # near-black star
+NAVY_COLOR = "#666666"       # mid-grey triangle
+BORDER_COLOR = "#9aa0a8"     # voivodeship lines
+OUTLINE_COLOR = "#202020"    # national outline
+CMAP = LinearSegmentedColormap.from_list("reach_grey", ["#cfcfcf", "#1a1a1a"])
 VMIN, VMAX = 5, 60
 
 

@@ -1,134 +1,72 @@
 # Air-rescue civil-military integration models
 
-Computational supplement to the study
+**Version 2.0.0**
 
-> M. M. Kasperek (2026). *Civil-military integration of a reformed national
-> air-rescue network.* (preprint).
+Computational supplement to:
 
-This repository holds the two deterministic models that regenerate the figures
-of the paper. Running them reproduces every quantitative result of Appendix 1
-and Appendix 2 to the unit, with the small exception noted below for the
-placement minutes.
+> Kasperek, M. M. (2026). *A Public–Private Mobilisation Reserve for Air Medical
+> Evacuation: Institutional Design and Economic Appraisal.*
+
+Author: **Maciej M. Kasperek**, ORCID [0009-0008-7419-0851](https://orcid.org/0009-0008-7419-0851).
+
+Code licensed under Apache 2.0 (`LICENSE.md`).
+Boundary data from **geoBoundaries** (<https://www.geoboundaries.org>), used under CC BY 4.0. See `NOTICE.md`.
+
+This package reproduces every number, table and figure in the article from source.
 
 The Polish-language version of this README is in `README.pl.md`.
 
 ## Contents
 
-| File | Reproduces | What it does |
-| --- | --- | --- |
-| `economic_model.py` | Tables 2 and 3 (Appendix 1) | Ten-year simulation of the LEM-PPP company, net present value, the optimistic scenario, and the sensitivity of the net investment balance to the discount rate. |
-| `reserve_placement.py` | Appendix 2 | Discrete p-centre (minimax) placement of the four civil AW101, by exhaustive enumeration of all 35 combinations of the seven Regional Centres, plus the two-pillar variant adding the Navy base at Darlowo. |
-| `poland_boundary.geojson` | Appendix 2 | National outline (ADM0) of Poland from geoBoundaries, the land grid for the placement is built from it. |
-| `poland_voivodeships.geojson` | Figure A2.1 | Voivodeship borders (ADM1) from geoBoundaries, drawn on the map for orientation. |
-| `figure_a2_1.py` | Figure A2.1 | Renders the two-pillar reach-time map, the five bases and the two southern residual salients. Needs matplotlib and numpy. |
-| `tests/` | both | Nineteen unit tests that check the reproduced figures against the paper. |
+- `economic_model.py` — financial and fiscal model (hypotheses H1 and H2). Run `python economic_model.py` to print the base-case results.
+- `reserve_placement.py` — spatial reach and availability model (hypothesis H3). Run `python reserve_placement.py` to print base placement and coverage.
+- `figure_zones.py` — generates Figure 1, the viability matrix (`figure_zones.png`).
+- `figure_a2_1.py` — generates Figure 2, the two-pillar reach map (`figure_A2_1.png`).
+- `tables.py` — generates every numeric table from the models (`tables.md`).
+- `poland_boundary.geojson`, `poland_voivodeships.geojson` — national (ADM0) and voivodeship (ADM1) boundaries of Poland from the geoBoundaries open database, redistributed unmodified under CC BY 4.0. See `NOTICE.md`.
+- `tests/` — 37 unit tests that lock every headline value.
+- `requirements.txt` — Python dependencies.
+- `LICENSE.md`, `NOTICE.md` — licence of this code and attribution for the redistributed boundary data.
+- `.gitattributes` — keeps line endings stable so the checksums in `MD5SUMS.txt` verify on every platform.
+- `.gitignore` — keeps local caches (`__pycache__`, `.pytest_cache`) and generated output out of the repository.
 
-## Requirements
+## Reproduce
 
-Python 3.8 or newer. The two models use only the standard library, so they have
-no runtime dependencies. The test suite uses `pytest`.
+    pip install -r requirements.txt
+    python -m pytest -q          # 37 tests, all headline numbers
+    python economic_model.py     # base-case economic results
+    python reserve_placement.py  # spatial coverage results
+    python figure_zones.py       # Figure 1
+    python figure_a2_1.py        # Figure 2
+    python tables.py             # all tables
 
-```bash
-pip install -r requirements.txt   # only needed to run the tests
-```
+## Base-case headline values
 
-## Running the models
+- Private-partner equity NPV +7, IRR 10.5 per cent, break-even fee 63 (H2).
+- Whole-of-system public cost: 601 resource, 481 budgetary, 399 economic; against 681 for public ownership and 682 to 768 for an availability contract; savings 80 and 282 (H1).
+- Terminal company value 582 (state share 297, private share 285), single source of truth.
+- Coverage within 45 minutes is exactly linear in military availability, 90.5 per cent plus 4.5 points per unit of availability (H3).
 
-```bash
-python economic_model.py
-python reserve_placement.py
-```
-
-`economic_model.py` prints Table 2 (the company simulation with real and nominal
-cash flows, the net present value, the optimistic value, and the treasury
-benefit) and Table 3 (the sensitivity of the net investment balance at 3, 4 and
-5 per cent). Every figure matches the paper exactly.
-
-`reserve_placement.py` prints the single-pillar optimum (Krakow, Lublin, Poznan
-and Olsztyn), its worst-case reach, the conventional four-city reference, and the
-two-pillar worst-case after the Navy base at Darlowo is added. It also reports
-the reach to the named reference points on the Baltic coast and at the southern
-mountain salients.
-
-## Running the tests
-
-```bash
-python -m pytest tests/ -v
-```
-
-## Generating Figure A2.1
-
-```bash
-python figure_a2_1.py
-```
-
-This writes `figure_A2_1.png`, the two-pillar reach-time map. It colours every
-land point by its reach to the nearest reserve base, marks the five bases, and
-crosses the two southern residual salients near Klodzko and in the Bieszczady,
-both about 57 minutes. The script needs matplotlib and numpy.
-
-## Boundary and figures
-
-The placement runs on `poland_boundary.geojson`, the national outline (ADM0) of
-Poland from the geoBoundaries open database. With this boundary the model
-reproduces the paper. The optimum is Krakow, Lublin, Poznan and Olsztyn. The
-single-pillar worst case is 58.6 minutes, at the central Baltic coast near Rowy,
-against 69.8 for the conventional four-city set. The Navy base at Darlowo sits on
-that same central stretch of coast, so adding it brings the central coast within
-about 15 minutes and the north-western corner within about 37. The country-wide
-two-pillar worst case is 57.3 minutes, at the southern mountain salients, Klodzko
-in the south-west and the Bieszczady in the south-east, a near tie. The economic
-model is exact to the unit. On a five-kilometre grid the single-pillar worst case
-falls between 58 and 59 minutes depending on which coastal cell is sampled.
-Substituting another national boundary in `poland_boundary.geojson` changes
-nothing in the algorithm.
-
-## Method, in brief
-
-The placement follows a discrete p-centre rule. For every combination of four of
-the seven Regional Centres, the model computes the worst-case reach over a
-five-kilometre land grid, where reach is great-circle distance divided by a
-cruise speed of 278 km/h plus five minutes for start-up. The combination with
-the smallest worst-case reach is the global optimum, found by enumeration rather
-than by a heuristic.
-
-The economic model values the company as a financial entity over a ten-year
-horizon, with a net result, a free cash flow that adds back depreciation and
-subtracts replacement capital, and a terminal residual value. The company is
-discounted at 4 per cent in real terms, the public balance at the social rate of
-3 per cent. A nominal variant grown at the 2.5 per cent inflation target and
-discounted at the matching nominal rate returns the same present value, by the
-Fisher relation.
-
-## Boundary data
-
-`poland_boundary.geojson` (ADM0) and `poland_voivodeships.geojson` (ADM1) are
-Poland outlines from geoBoundaries (gbOpen release). geoBoundaries is distributed
-under CC BY 4.0, separately from the Apache-licensed code. Please keep this
-attribution if you redistribute the files.
-
-> Runfola, D., et al. (2020). geoBoundaries: A global database of political
-> administrative boundaries. *PLoS ONE* 15(4), e0231866.
-> https://www.geoboundaries.org
+All amounts are in million zloty, constant 2026 prices.
 
 ## How to cite
 
-If you use this software, please cite both the paper and the software record.
+If you use this software, please cite both the paper and the software.
 
 Paper:
-
-> Kasperek, M. M. (2026). Civil-military integration of a reformed national
-> air-rescue network. (preprint).
+> Kasperek, M. M. (2026). A Public–Private Mobilisation Reserve for Air Medical
+> Evacuation: Institutional Design and Economic Appraisal.
 
 Software:
-
 > Kasperek, M. M. (2026). *Air-rescue civil-military integration models*
-> (version 1.0.0) [Software]. Zenodo. https://doi.org/10.5281/zenodo.20734498
+> (version 2.0.0) [Software].
 
 ## Author
 
 Maciej M. Kasperek. ORCID 0009-0008-7419-0851.
 
-## Licence
+## What is not here
 
-Apache License 2.0. See `LICENSE` and `NOTICE`.
+The manuscript source is deliberately not included. This repository holds the
+models, the data and the scripts that regenerate every table and figure, which is
+what reproduction requires.

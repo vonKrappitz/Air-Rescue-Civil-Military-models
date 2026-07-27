@@ -194,6 +194,92 @@ def reach_to_reference(base_coords):
 
 
 # --------------------------------------------------------------------------- #
+# H3: spatial availability of the military pillar
+# --------------------------------------------------------------------------- #
+# The military AW101 at Darlowo is not always free. These scenarios weight the
+# reach it provides by the probability that it is available, and a point that
+# only the military pillar can reach on time counts with that probability.
+AVAILABILITY_SCENARIOS = (0.25, 0.50, 0.75)
+REACH_THRESHOLDS = (45, 60)
+
+
+def per_point_reach(grid, civil_coords, navy_coords):
+    """For each land point, the civil-only reach and the best-of-both reach."""
+    out = []
+    for p in grid:
+        civil = reach_min(min(haversine_km(p, b) for b in civil_coords))
+        with_navy = reach_min(min(haversine_km(p, b) for b in navy_coords))
+        out.append((civil, min(civil, with_navy)))
+    return out
+
+
+def coverage_within(grid, civil_coords, navy_coords, threshold, p_available):
+    """Fraction of land points reachable within threshold minutes.
+
+    A point the civil bases reach on their own counts fully. A point only the
+    military pillar can reach in time counts with probability p_available.
+    """
+    pts = per_point_reach(grid, civil_coords, navy_coords)
+    total = 0.0
+    for civil, combined in pts:
+        if civil <= threshold:
+            total += 1.0
+        elif combined <= threshold:
+            total += p_available
+    return total / len(pts)
+
+
+def expected_reach(grid, civil_coords, navy_coords, p_available):
+    """Mean availability-weighted reach, p*min(civil,navy) + (1-p)*civil."""
+    pts = per_point_reach(grid, civil_coords, navy_coords)
+    total = sum(p_available * combined + (1 - p_available) * civil for civil, combined in pts)
+    return total / len(pts)
+
+
+def h3_coverage_table(grid, civil_coords, navy_coords):
+    """Coverage within each threshold, civil-only and military at each availability."""
+    rows = []
+    for threshold in REACH_THRESHOLDS:
+        rows.append(dict(
+            threshold=threshold,
+            civil_only=coverage_within(grid, civil_coords, navy_coords, threshold, 0.0),
+            by_availability={p: coverage_within(grid, civil_coords, navy_coords, threshold, p)
+                             for p in AVAILABILITY_SCENARIOS},
+            full=coverage_within(grid, civil_coords, navy_coords, threshold, 1.0),
+        ))
+    return rows
+
+
+def h3_holds(grid, civil_coords, navy_coords):
+    """H3. Military access reduces the readiness gap even at low availability.
+
+    True when, at every availability scenario and both thresholds, coverage with
+    the military pillar is at least as high as civil-only, and strictly higher
+    for at least one threshold at the lowest availability.
+    """
+    improved = False
+    for threshold in REACH_THRESHOLDS:
+        civil_only = coverage_within(grid, civil_coords, navy_coords, threshold, 0.0)
+        for p in AVAILABILITY_SCENARIOS:
+            cov = coverage_within(grid, civil_coords, navy_coords, threshold, p)
+            if cov < civil_only - 1e-9:
+                return False
+            if cov > civil_only + 1e-9:
+                improved = True
+    return improved
+
+
+def standard_coords(grid=None):
+    """The optimal four civil bases and the Darlowo navy base."""
+    if grid is None:
+        grid = land_grid()
+    best = optimal_placement(grid)
+    civil = [CANDIDATES[c] for c in best["bases"]]
+    navy = list(NAVY_BASE.values())
+    return civil, navy
+
+
+# --------------------------------------------------------------------------- #
 # Reporting
 # --------------------------------------------------------------------------- #
 def main():
@@ -227,6 +313,14 @@ def main():
     tp_ref = reach_to_reference(two_pillar)
     for name in REFERENCE_POINTS:
         print(f"  {name:<30} civil {civil_ref[name]:>5.1f}   two-pillar {tp_ref[name]:>5.1f}")
+
+    print("\nH3, coverage within threshold by military availability")
+    civil_coords, navy_coords = standard_coords(grid)
+    print(f"H3 holds: {h3_holds(grid, civil_coords, navy_coords)}")
+    for row in h3_coverage_table(grid, civil_coords, navy_coords):
+        print(f"  within {row['threshold']} min  civil-only {row['civil_only'] * 100:5.1f}%"
+              + "".join(f"   p={p:.2f} {c * 100:5.1f}%" for p, c in row['by_availability'].items())
+              + f"   full {row['full'] * 100:5.1f}%")
 
 
 if __name__ == "__main__":

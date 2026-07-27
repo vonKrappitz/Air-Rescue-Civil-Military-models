@@ -1,152 +1,360 @@
 """economic_model.py
 
-Ten-year economic simulation of the LEM-PPP air-medical company and the
-investment-balance sensitivity of the wider reform.
+Ex ante economic appraisal of a public-private air-medical mobilisation reserve
+for Poland. The model compares capability-equivalent ways of providing a defined
+intercontinental MEDEVAC readiness and tests three hypotheses.
 
-This script regenerates Table 2 (company simulation, net present value) and
-Table 3 (sensitivity of the net investment balance) of Appendix 1 in:
+    H1  For an identical readiness output, the discounted public cost of the
+        LEM-PPP model is lower than a capability-equivalent all-public operator.
+    H2  Under the conservative commercial-demand scenario, the private partner's
+        equity NPV is non-negative at the assumed required rate of return.
+    (H3 is the spatial-availability test in reserve_placement.py.)
 
-    M. M. Kasperek (2026). Civil-military integration of a reformed national
-    air-rescue network. Defence and Peace Economics (preprint).
+All amounts are in million PLN, constant 2026 prices. The model is deterministic
+and every headline value is reproduced to the unit by the test suite.
 
-All amounts are in million PLN, in constant 2026 prices unless stated.
-The model is fully deterministic. Running the file prints both tables and the
-headline figures, and every value is reproduced to the unit.
-
-Conventions follow the appraisal framework of Section 4:
-    WN_t  = R_t - OPEX_t - D_t            (net accounting result)
-    CF_t  = WN_t + D_t - CapEx_t          (free cash flow, depreciation added back)
-    NPV   = sum_t CF_t / (1+r)^t + RV / (1+r)^T
-
-The financial rate r is 4 per cent real (EU Economic Appraisal Vademecum
-2021-2027). The social rate of 3 per cent is used for the public balance, and
-the sensitivity spans 3, 4 and 5 per cent. The nominal variant grows the flows
-at the 2.5 per cent inflation target and discounts at the matching nominal rate,
-so by the Fisher relation it returns the same present value.
+Reference for M. M. Kasperek (2026), Defence and Peace Economics (preprint).
 """
 
-from itertools import combinations  # noqa: F401  (kept for parity with placement module)
-
 # --------------------------------------------------------------------------- #
-# Company simulation inputs (Table 2), million PLN, constant 2026 prices
+# 1. Base-case parameters
 # --------------------------------------------------------------------------- #
-REVENUE = [55, 68, 80, 98, 110, 115, 118, 120, 122, 123]
-OPEX = [60, 60, 60, 60, 60, 61, 61, 62, 62, 63]
-DEPRECIATION = 18                       # in-kind fleet (~190 m PLN) over 15 years
-CAPEX = [3, 3, 3, 3, 3, 12, 3, 3, 3, 3]  # routine 3 per year, mid-life refit 12 in year 6
-RESIDUAL_VALUE = 50                     # real terminal value, year 10
 HORIZON = 10
 
+# Capital structure at t = 0. The public side contributes the existing long-range
+# fleet in kind (two Learjet 75 and one Piaggio Avanti II, about 120 at current
+# value) plus a cash top-up. The private partner contributes cash of 180.
+IN_KIND_FLEET = 120
+PUBLIC_CASH = 70
+PRIVATE_CONTRIBUTION = 180
+I0_PUBLIC = IN_KIND_FLEET + PUBLIC_CASH        # 190
+I0_PRIVATE = PRIVATE_CONTRIBUTION              # 180
+I0_TOTAL = I0_PUBLIC + I0_PRIVATE              # 370
+
+PUBLIC_SHARE = 0.51
+PRIVATE_SHARE = 1 - PUBLIC_SHARE               # 0.49
+REINVEST_SHARE = 0.15
+
+# Readiness fee. The state pays the company an annual fee to hold the capability
+# on standby. It is the central lever of the appraisal and is varied in the
+# threshold analysis.
+READINESS_FEE = 65
+
+# Commercial revenue. A utilisation ramp as the operation matures, then modest
+# organic growth at 2.5 per cent a year, well below the market rate of about ten
+# to eleven per cent, so the base case does not lean on optimistic demand.
+COMMERCIAL_RAMP = [24, 38, 50, 59, 64, 66, 68, 68, 69, 70]
+COMMERCIAL_GROWTH = 0.025
+
+# Operating cost. A fixed readiness cost plus a marginal cost on the commercial
+# volume that grows beyond the base ramp. MARGINAL_COST is the variable cost per
+# unit of extra commercial revenue.
+OPEX_BASE = [65, 65, 65, 65, 65, 66, 66, 67, 67, 68]
+MARGINAL_COST = 0.30
+
+DEPRECIATION = 21                              # whole fleet ~311 m over 15 years
+CAPEX = [3, 3, 3, 3, 3, 12, 3, 3, 3, 3]        # routine plus a mid-life refit
+RESIDUAL_VALUE = 50                            # real terminal fleet value, year 10
+
 # Rates
-FINANCIAL_RATE = 0.04                   # company appraisal, real
-SOCIAL_RATE = 0.03                      # public balance
-INFLATION = 0.025                       # NBP target, used for the nominal variant
+FINANCIAL_RATE = 0.04                          # company appraisal, real
+SOCIAL_RATE = 0.03                             # public balance
+INFLATION = 0.025
+HURDLE_PRIVATE = 0.10                           # private required return, real
+EXIT_MULTIPLE = 10                              # going-concern exit, times year-10 profit
 
-# The annual readiness fee from the Ministry of National Defence is part of
-# revenue. The optimistic scenario lifts only the commercial part (revenue less
-# the fee), so the fee is held fixed.
-MON_FEE = 35
-
-# Ownership and dividend policy
-PUBLIC_SHARE = 0.51                     # MON 31 % + MZ 20 %
-REINVEST_SHARE = 0.15                   # each side reinvests at least this fraction
-FLEET_MAINTENANCE_SAVING = 300          # treasury saving over the decade
+# Counterfactual parameters
+MAINT_PUBLIC_FLEET = 30                         # current fixed-wing upkeep, a year
+FIXED_READINESS = 40                            # public readiness cost, no commercial
+XRS_CAPEX = 121                                 # buy and convert two long-range jets
+AVAILABILITY_FEE = (50, 60)                      # pure availability contract, a year
 
 
 # --------------------------------------------------------------------------- #
-# Core functions
+# 2. Company simulation
 # --------------------------------------------------------------------------- #
-def net_result(revenue, opex=OPEX, depreciation=DEPRECIATION):
-    """WN_t = R_t - OPEX_t - D_t."""
-    return [revenue[i] - opex[i] - depreciation for i in range(HORIZON)]
+def commercial(growth=COMMERCIAL_GROWTH):
+    return [COMMERCIAL_RAMP[k] * (1 + growth) ** k for k in range(HORIZON)]
 
 
-def free_cash_flow(revenue, capex=CAPEX, depreciation=DEPRECIATION):
-    """CF_t = WN_t + D_t - CapEx_t."""
-    wn = net_result(revenue, depreciation=depreciation)
-    return [wn[i] + depreciation - capex[i] for i in range(HORIZON)]
+def opex(growth=COMMERCIAL_GROWTH):
+    return [OPEX_BASE[k] + MARGINAL_COST * COMMERCIAL_RAMP[k] * ((1 + growth) ** k - 1)
+            for k in range(HORIZON)]
 
 
-def npv(cash_flow, rate=FINANCIAL_RATE, residual=RESIDUAL_VALUE):
-    """Present value of a ten-year flow with a terminal residual at year T.
+def revenue(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    com = commercial(growth)
+    return [fee + com[k] for k in range(HORIZON)]
 
-    Flows are dated t = 1..T. The residual is discounted at year T.
-    """
-    pv = sum(cash_flow[i] / (1 + rate) ** (i + 1) for i in range(HORIZON))
+
+def net_result(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    rev = revenue(fee, growth)
+    ox = opex(growth)
+    return [rev[k] - ox[k] - DEPRECIATION for k in range(HORIZON)]
+
+
+def free_cash_flow(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    wn = net_result(fee, growth)
+    return [wn[k] + DEPRECIATION - CAPEX[k] for k in range(HORIZON)]
+
+
+def npv(flow, rate, residual=0.0):
+    pv = sum(flow[k] / (1 + rate) ** (k + 1) for k in range(len(flow)))
     return pv + residual / (1 + rate) ** HORIZON
 
 
-def nominal_flow(real_flow, inflation=INFLATION):
-    """Inflate a real flow to nominal terms at year t = i + 1."""
-    return [real_flow[i] * (1 + inflation) ** (i + 1) for i in range(len(real_flow))]
-
-
-def fisher_rate(real_rate=FINANCIAL_RATE, inflation=INFLATION):
-    """(1 + r_nom) = (1 + r)(1 + pi)."""
-    return (1 + real_rate) * (1 + inflation) - 1
-
-
-def commercial_uplift_flow(uplift, fee=MON_FEE):
-    """Revenue with the commercial part (revenue less the fee) scaled by uplift."""
-    scaled = [fee + (REVENUE[i] - fee) * uplift for i in range(HORIZON)]
-    return free_cash_flow(scaled)
-
-
-def solve_uplift_for_target(target_npv, fee=MON_FEE):
-    """Commercial-revenue uplift that brings the NPV to a target value.
-
-    Linear in the uplift, so it is solved in closed form rather than searched.
-    """
-    base = npv(free_cash_flow(REVENUE))
-    df = [1 / (1 + FINANCIAL_RATE) ** (i + 1) for i in range(HORIZON)]
-    pv_commercial = sum((REVENUE[i] - fee) * df[i] for i in range(HORIZON))
-    return 1 + (target_npv - base) / pv_commercial
-
-
-def dividend_to_treasury(cumulative_to_year_nine):
-    """State cash from dividends.
-
-    Dividends are declared on the prior year's profit, so the pool available in a
-    ten-year window is the cumulative result through year nine. The public side
-    takes its share and reinvests a fraction of it.
-    """
-    return cumulative_to_year_nine * PUBLIC_SHARE * (1 - REINVEST_SHARE)
+def annuity(amount, rate=SOCIAL_RATE, years=HORIZON):
+    return sum(amount / (1 + rate) ** t for t in range(1, years + 1))
 
 
 # --------------------------------------------------------------------------- #
-# Investment-balance sensitivity (Table 3)
+# 3. Three value measures
 # --------------------------------------------------------------------------- #
-# Fleet unit prices (million PLN). Low end is the optimistic purchase, high end
-# the conservative one. The civilian AW101 omits naval defence systems, so it is
-# priced below the 412.5 m PLN per unit of the 2019 naval contract.
+def pv_operating(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """Present value of operating flows plus residual, before the t=0 capital."""
+    return npv(free_cash_flow(fee, growth), FINANCIAL_RATE, RESIDUAL_VALUE)
+
+
+def npv_project(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """Project NPV with the full initial capital at t = 0."""
+    return pv_operating(fee, growth) - I0_TOTAL
+
+
+def npv_project_new_money(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """Project NPV counting only new cash at t = 0, the in-kind fleet excluded."""
+    return pv_operating(fee, growth) - (PUBLIC_CASH + I0_PRIVATE)
+
+
+def break_even_year(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """First year with a positive annual accounting result."""
+    wn = net_result(fee, growth)
+    for k in range(HORIZON):
+        if wn[k] > 0:
+            return k + 1
+    return None
+
+
+# --------------------------------------------------------------------------- #
+# 4. Private-equity cash flow (H2)
+# --------------------------------------------------------------------------- #
+def _dividends_private(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """Private share of dividends, declared on the prior year's positive profit."""
+    wn = net_result(fee, growth)
+    return [(wn[i - 1] * (1 - REINVEST_SHARE) * PRIVATE_SHARE)
+            if (i >= 1 and wn[i - 1] > 0) else 0.0 for i in range(HORIZON)]
+
+
+def terminal_company_value(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH,
+                           exit_multiple=EXIT_MULTIPLE):
+    """Going-concern value of the whole company at year 10.
+
+    Single source of truth for the terminal value, used by both the private
+    exit and the state's economic residual, so the two cannot diverge.
+    """
+    return exit_multiple * net_result(fee, growth)[-1]
+
+
+def private_fcfe(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH, exit_multiple=EXIT_MULTIPLE):
+    """Free cash flow to the private partner, t = 0..10.
+
+    Contribution at t = 0, dividends each year, and the resale of the 49 per cent
+    stake at year 10 valued as a going concern at exit_multiple times profit.
+    """
+    div = _dividends_private(fee, growth)
+    exit_value = PRIVATE_SHARE * terminal_company_value(fee, growth, exit_multiple)
+    return [-I0_PRIVATE] + [div[k] + (exit_value if k == HORIZON - 1 else 0.0)
+                            for k in range(HORIZON)]
+
+
+def equity_npv(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH, rate=HURDLE_PRIVATE,
+               exit_multiple=EXIT_MULTIPLE):
+    fcfe = private_fcfe(fee, growth, exit_multiple)
+    return sum(cf / (1 + rate) ** t for t, cf in enumerate(fcfe))
+
+
+def equity_irr(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH, exit_multiple=EXIT_MULTIPLE):
+    fcfe = private_fcfe(fee, growth, exit_multiple)
+    lo, hi = -0.9, 2.0
+    for _ in range(200):
+        mid = (lo + hi) / 2
+        v = sum(cf / (1 + mid) ** t for t, cf in enumerate(fcfe))
+        if v > 0:
+            lo = mid
+        else:
+            hi = mid
+    return mid
+
+
+def equity_payback(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH, exit_multiple=EXIT_MULTIPLE):
+    """First year the undiscounted cumulative FCFE turns non-negative."""
+    fcfe = private_fcfe(fee, growth, exit_multiple)
+    cum = 0.0
+    for t, cf in enumerate(fcfe):
+        cum += cf
+        if t > 0 and cum >= 0:
+            return t
+    return None
+
+
+# --------------------------------------------------------------------------- #
+# 5. Capability-equivalent comparators, public cost (H1)
+# --------------------------------------------------------------------------- #
+def public_cost_status_quo():
+    """Variant A. Present fleet kept, no intercontinental readiness (not equivalent)."""
+    return annuity(MAINT_PUBLIC_FLEET)
+
+
+def public_cost_public_ownership(fixed_readiness=FIXED_READINESS):
+    """Variant B. The state buys and operates the jets, no commercial business."""
+    return XRS_CAPEX + annuity(fixed_readiness) - RESIDUAL_VALUE / (1 + SOCIAL_RATE) ** HORIZON
+
+
+def public_cost_availability(fee_range=AVAILABILITY_FEE):
+    """Variant C. A private owner sells guaranteed availability, no state equity."""
+    low, high = fee_range
+    return (annuity(low), annuity(high))
+
+
+def public_cost_ppp(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH, terminal="cash"):
+    """Variant D. The proposed 51/49 company, net public cost.
+
+    Outlays are the in-kind fleet at its full contributed value, the cash top-up
+    and the readiness fee. Returns are the state share of dividends and of the
+    terminal value, and the upkeep of the old fixed-wing unit avoided once the
+    company takes over.
+
+    terminal='cash' credits the state only its share of the fleet resale, the
+    conservative fiscal view where the state holds the stake and never sells it.
+    terminal='economic' credits the state its 51 per cent of the going-concern
+    company value, the economic view the reviewer also asks for.
+    """
+    wn = net_result(fee, growth)
+    div_public = sum((wn[i - 1] * PUBLIC_SHARE * (1 - REINVEST_SHARE)) / (1 + SOCIAL_RATE) ** (i + 1)
+                     for i in range(1, HORIZON) if wn[i - 1] > 0)
+    outlay = IN_KIND_FLEET + PUBLIC_CASH + annuity(fee)
+    if terminal == "economic":
+        terminal_state = PUBLIC_SHARE * terminal_company_value(fee, growth)
+    else:
+        terminal_state = PUBLIC_SHARE * RESIDUAL_VALUE
+    residual_state = terminal_state / (1 + SOCIAL_RATE) ** HORIZON
+    return outlay - div_public - annuity(MAINT_PUBLIC_FLEET) - residual_state
+
+
+def fiscal_saving(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH, terminal="cash"):
+    """H1 headline. Public cost of the all-public comparator less the PPP."""
+    return public_cost_public_ownership() - public_cost_ppp(fee, growth, terminal)
+
+
+def public_cost_components(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """PV components of the public cost, million zloty at the social rate.
+
+    Exposed so the public-cost table can show the full arithmetic and a reader
+    can trace the three measures without opening the model.
+    """
+    wn = net_result(fee, growth)
+    pv_fee = annuity(fee)
+    div_public = sum((wn[i - 1] * PUBLIC_SHARE * (1 - REINVEST_SHARE)) / (1 + SOCIAL_RATE) ** (i + 1)
+                     for i in range(1, HORIZON) if wn[i - 1] > 0)
+    pv_avoided = annuity(MAINT_PUBLIC_FLEET)
+    pv_stake_gc = PUBLIC_SHARE * terminal_company_value(fee, growth) / (1 + SOCIAL_RATE) ** HORIZON
+    pv_stake_fleet = PUBLIC_SHARE * RESIDUAL_VALUE / (1 + SOCIAL_RATE) ** HORIZON
+    return dict(in_kind=float(IN_KIND_FLEET), cash=float(PUBLIC_CASH), pv_fee=pv_fee,
+                div_public=div_public, pv_avoided=pv_avoided,
+                pv_stake_gc=pv_stake_gc, pv_stake_fleet=pv_stake_fleet)
+
+
+def budgetary_outlay(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """Measure 1. New cash from the budget, the in-kind fleet excluded.
+
+    The existing fleet is already owned by the state, so it is not a fresh
+    budgetary expense. This measure counts only new cash out (top-up and fee),
+    less the cash the state receives back (dividends, avoided upkeep, fleet-share
+    residual).
+    """
+    c = public_cost_components(fee, growth)
+    return c["cash"] + c["pv_fee"] - c["div_public"] - c["pv_avoided"] - c["pv_stake_fleet"]
+
+
+def resource_cost(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """Measure 2. Resource cost, the in-kind fleet counted at its value.
+
+    Comparable with public ownership, which also counts the aircraft as a
+    resource. This is the figure the public_cost_ppp cash basis returns.
+    """
+    return IN_KIND_FLEET + budgetary_outlay(fee, growth)
+
+
+def economic_cost(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """Measure 3. Economic cost, the state's going-concern stake recognised.
+
+    Instead of crediting the state only its share of the fleet residual, this
+    measure credits its 51 per cent of the going-concern company value at exit.
+    """
+    c = public_cost_components(fee, growth)
+    return (c["in_kind"] + c["cash"] + c["pv_fee"] - c["div_public"]
+            - c["pv_avoided"] - c["pv_stake_gc"])
+
+
+# --------------------------------------------------------------------------- #
+# 6. Thresholds
+# --------------------------------------------------------------------------- #
+def fee_for_equity_breakeven(growth=COMMERCIAL_GROWTH):
+    """F*. The readiness fee at which the private equity NPV is zero."""
+    lo, hi = 20.0, 200.0
+    for _ in range(100):
+        mid = (lo + hi) / 2
+        if equity_npv(mid, growth) < 0:
+            lo = mid
+        else:
+            hi = mid
+    return mid
+
+
+def rate_threshold_table(rates=(0.65, 0.86, 1.03, 1.21)):
+    """PV of operating flows across average intercontinental mission rates.
+
+    Rates in million PLN a mission map to a year-one commercial figure through
+    the fleet mission ceiling, so the table shows sensitivity to the one price
+    the base case most depends on. Reported for context, not as the base.
+    """
+    rows = []
+    for price in rates:
+        # commercial year-one scales with the rate relative to the 0.86 base
+        scale = price / 0.86
+        g = COMMERCIAL_GROWTH
+        com = [COMMERCIAL_RAMP[k] * scale * (1 + g) ** k for k in range(HORIZON)]
+        ox = [OPEX_BASE[k] + MARGINAL_COST * COMMERCIAL_RAMP[k] * scale * ((1 + g) ** k - 1)
+              for k in range(HORIZON)]
+        rev = [READINESS_FEE + com[k] for k in range(HORIZON)]
+        wn = [rev[k] - ox[k] - DEPRECIATION for k in range(HORIZON)]
+        fcf = [wn[k] + DEPRECIATION - CAPEX[k] for k in range(HORIZON)]
+        rows.append(dict(price=price, pv=npv(fcf, FINANCIAL_RATE, RESIDUAL_VALUE),
+                         profit10=wn[-1]))
+    return rows
+
+
+# --------------------------------------------------------------------------- #
+# 7. Investment balance of the reform (Table 3), fleet-price sensitivity
+# --------------------------------------------------------------------------- #
 FLEET = {
     "AW101 heavy MEDEVAC": dict(units=4, low=280, high=340),
     "H145 HEMS-Primary": dict(units=28, low=90, high=120),
     "H145 reserve": dict(units=3, low=90, high=120),
     "Cessna Grand Caravan EX (STOL)": dict(units=3, low=10, high=12),
 }
-RESALE_WITHDRAWN = dict(units=14, low=6, high=10)     # EC135/H135 secondary market
-CONVERSION_SAVING = dict(units=9, low=30, high=40)    # H135 to light class, per unit
+RESALE_WITHDRAWN = dict(units=14, low=6, high=10)
+CONVERSION_SAVING = dict(units=9, low=30, high=40)
 
 
 def gross_purchase(level):
-    """Total fleet purchase. level is 'low', 'high' or 'mid'."""
     total = 0.0
     for item in FLEET.values():
-        if level == "mid":
-            unit = (item["low"] + item["high"]) / 2
-        else:
-            unit = item[level]
+        unit = (item["low"] + item["high"]) / 2 if level == "mid" else item[level]
         total += item["units"] * unit
     return total
 
 
 def compensations(level):
-    """Resale of withdrawn airframes plus the conversion saving.
-
-    The recovery is highest in the optimistic case, so 'high' here pairs with the
-    low purchase price, and 'low' with the high purchase price.
-    """
     if level == "mid":
         resale = RESALE_WITHDRAWN["units"] * (RESALE_WITHDRAWN["low"] + RESALE_WITHDRAWN["high"]) / 2
         conv = CONVERSION_SAVING["units"] * (CONVERSION_SAVING["low"] + CONVERSION_SAVING["high"]) / 2
@@ -156,21 +364,32 @@ def compensations(level):
     return resale + conv
 
 
-def present_value_even(net, rate, years=4):
-    """Net balance spread evenly over the outlay years, first tranche undiscounted.
+def cash_financing_requirement(cost_level, recovery_level):
+    """Gross fleet purchase less the resale of withdrawn airframes only."""
+    resale = (RESALE_WITHDRAWN["units"] * RESALE_WITHDRAWN[recovery_level]
+              if recovery_level != "mid"
+              else RESALE_WITHDRAWN["units"] * (RESALE_WITHDRAWN["low"] + RESALE_WITHDRAWN["high"]) / 2)
+    return gross_purchase(cost_level) - resale
 
-    The outlays fall in 2026-2029, so the first tranche is dated t = 0.
-    """
-    annuity = sum(1 / (1 + rate) ** t for t in range(years))
-    return (net / years) * annuity
+
+def incremental_economic_cost(cost_level, recovery_level):
+    """Cash financing requirement less the avoided cost of an all-new light fleet."""
+    conv = (CONVERSION_SAVING["units"] * CONVERSION_SAVING[recovery_level]
+            if recovery_level != "mid"
+            else CONVERSION_SAVING["units"] * (CONVERSION_SAVING["low"] + CONVERSION_SAVING["high"]) / 2)
+    return cash_financing_requirement(cost_level, recovery_level) - conv
+
+
+def present_value_even(net, rate, years=4):
+    ann = sum(1 / (1 + rate) ** t for t in range(years))
+    return (net / years) * ann
 
 
 def sensitivity_rows():
-    """Three scenarios of the net investment balance with present values."""
     scenarios = [
-        ("Conservative (worst)", "high", "low"),   # highest cost, lowest recovery
+        ("Conservative (worst)", "high", "low"),
         ("Central", "mid", "mid"),
-        ("Optimistic (best)", "low", "high"),      # lowest cost, highest recovery
+        ("Optimistic (best)", "low", "high"),
     ]
     rows = []
     for name, cost_level, recovery_level in scenarios:
@@ -183,57 +402,111 @@ def sensitivity_rows():
 
 
 # --------------------------------------------------------------------------- #
-# Reporting
+# 8. Reporting
 # --------------------------------------------------------------------------- #
-def print_table_2():
-    wn = net_result(REVENUE)
-    cf_real = free_cash_flow(REVENUE)
-    cf_nom = nominal_flow(cf_real)
-    print("Table 2. Economic simulation of the LEM-PPP company, ten years (million PLN)")
-    print(f"{'Year':>4} {'Revenue':>8} {'OPEX':>5} {'Depr.':>6} "
-          f"{'Net':>5} {'CF real':>8} {'CF nom':>7}")
-    for i in range(HORIZON):
-        print(f"{i + 1:>4} {REVENUE[i]:>8} {OPEX[i]:>5} {DEPRECIATION:>6} "
-              f"{wn[i]:>5} {cf_real[i]:>8} {round(cf_nom[i]):>7}")
-    print(f"{'Residual, year 10':>32} {RESIDUAL_VALUE:>8} {round(nominal_flow([RESIDUAL_VALUE]*10)[9]):>7}")
-
-    npv_real = npv(cf_real)
-    r_nom = fisher_rate()
-    npv_nom = npv(cf_nom, rate=r_nom, residual=RESIDUAL_VALUE * (1 + INFLATION) ** HORIZON)
-    print(f"NPV (4% financial), real  = {npv_real:6.1f}")
-    print(f"NPV (Fisher nominal)      = {npv_nom:6.1f}")
-
-    uplift = solve_uplift_for_target(437)
-    npv_opt = npv(commercial_uplift_flow(uplift))
-    print(f"Optimistic NPV            = {npv_opt:6.1f}  "
-          f"(commercial revenue +{(uplift - 1) * 100:.0f}%, NPV +{(npv_opt / npv_real - 1) * 100:.0f}%)")
-
-    cum = []
-    s = 0
-    for x in wn:
-        s += x
-        cum.append(s)
-    treasury = dividend_to_treasury(cum[8]) + FLEET_MAINTENANCE_SAVING
-    print(f"Cumulative net result, decade        = {cum[-1]:.0f}")
-    print(f"Cumulative through year nine (pool)  = {cum[8]:.0f}")
-    print(f"State dividend share                 = {dividend_to_treasury(cum[8]):.0f}")
-    print(f"Treasury benefit (dividend + saving) = {treasury:.0f}")
-
-
-def print_table_3():
-    print("\nTable 3. Sensitivity of the net investment balance (million PLN)")
-    print(f"{'Scenario':>22} {'Gross':>6} {'Comp.':>6} {'Net':>6} "
-          f"{'PV 3%':>7} {'PV 4%':>7} {'PV 5%':>7}")
-    for row in sensitivity_rows():
-        pv = row["pv"]
-        print(f"{row['name']:>22} {row['gross']:>6.0f} {row['comp']:>6.0f} "
-              f"{row['net']:>6.0f} {pv[0.03]:>7.0f} {pv[0.04]:>7.0f} {pv[0.05]:>7.0f}")
-
-
 def main():
-    print_table_2()
-    print_table_3()
+    wn = net_result()
+    print("=== Company simulation, readiness fee 65, growth 2.5% ===")
+    print(f"revenue      : {[round(x) for x in revenue()]}")
+    print(f"opex         : {[round(x) for x in opex()]}")
+    print(f"net result   : {[round(x) for x in wn]}")
+    print(f"break-even   : year {break_even_year()} (first positive annual result)")
+    print()
+    print("=== Three value measures ===")
+    print(f"PV of operating flows       = {pv_operating():7.1f}")
+    print(f"Project NPV, full I0 = 370  = {npv_project():7.1f}")
+    print(f"Project NPV, new money only = {npv_project_new_money():7.1f}")
+    print()
+    print("=== Private equity, H2 (contribution 180, hurdle 10%) ===")
+    print(f"equity NPV   = {equity_npv():7.1f}")
+    print(f"equity IRR   = {equity_irr() * 100:7.1f} %")
+    pb = equity_payback()
+    print(f"payback      = {pb if pb else 'none'} years")
+    print(f"F* fee for equity NPV = 0   = {fee_for_equity_breakeven():.0f}")
+    print()
+    print("=== Capability-equivalent public cost, H1 (PV, 3%) ===")
+    print(f"A status quo (less capable) = {public_cost_status_quo():6.0f}")
+    print(f"B public ownership          = {public_cost_public_ownership():6.0f}")
+    lo, hi = public_cost_availability()
+    print(f"C availability contract     = {lo:6.0f} to {hi:6.0f}")
+    print(f"D proposed PPP, cash view   = {public_cost_ppp(terminal='cash'):6.0f}")
+    print(f"D proposed PPP, economic    = {public_cost_ppp(terminal='economic'):6.0f}")
+    print(f"fiscal saving vs B, cash    = {fiscal_saving(terminal='cash'):6.0f}")
+    print(f"fiscal saving vs B, economic= {fiscal_saving(terminal='economic'):6.0f}")
+    print(f"terminal company value r10  = {terminal_company_value():6.0f} "
+          f"(state 51% = {PUBLIC_SHARE * terminal_company_value():.0f}, "
+          f"private 49% = {PRIVATE_SHARE * terminal_company_value():.0f})")
 
 
 if __name__ == "__main__":
     main()
+
+
+# --------------------------------------------------------------------------- #
+# 9. Whole-of-system (world-cost) convention
+# --------------------------------------------------------------------------- #
+# The fleet is segmented by range. The existing fixed-wing aircraft carry the
+# short-and-medium-haul medical transport task, and the new ultra-long-range
+# pair carries the long haul, one jet on standby and one in commercial service.
+# The short-and-medium-range task exists in every world, so in variants B and C
+# the existing fleet keeps flying as a separate state unit and its upkeep is an
+# explicit cost of those worlds, while in variant D the fleet and its task move
+# inside the company. No variant receives a credit the others lack.
+
+def legacy_upkeep_pv():
+    """PV of the continued upkeep of the existing fixed-wing unit, 30 a year."""
+    return annuity(MAINT_PUBLIC_FLEET)
+
+
+def world_cost_public_ownership():
+    """Variant B, whole of system: the new jets plus the continuing legacy unit."""
+    return public_cost_public_ownership() + legacy_upkeep_pv()
+
+
+def world_cost_availability():
+    lo, hi = public_cost_availability()
+    return (lo + legacy_upkeep_pv(), hi + legacy_upkeep_pv())
+
+
+def world_resource_cost(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """Variant D, whole of system, resource measure.
+
+    No credit for avoided legacy upkeep, because the legacy task and its cost
+    sit inside the company and are met from the fee and commercial revenue.
+    """
+    c = public_cost_components(fee, growth)
+    return c["in_kind"] + c["cash"] + c["pv_fee"] - c["div_public"] - c["pv_stake_fleet"]
+
+
+def world_budgetary_outlay(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """Variant D world cost on new cash only, the in-kind fleet excluded."""
+    return world_resource_cost(fee, growth) - IN_KIND_FLEET
+
+
+def world_economic_cost(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """Variant D world cost with the going-concern stake recognised."""
+    c = public_cost_components(fee, growth)
+    return world_resource_cost(fee, growth) - (c["pv_stake_gc"] - c["pv_stake_fleet"])
+
+
+def world_saving(measure="resource", fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    d = {"resource": world_resource_cost, "budgetary": world_budgetary_outlay,
+         "economic": world_economic_cost}[measure](fee, growth)
+    return world_cost_public_ownership() - d
+
+
+def symmetric_withdrawal_gap(fee=READINESS_FEE, growth=COMMERCIAL_GROWTH):
+    """Sensitivity. If the legacy fleet were withdrawn in every variant, B falls
+    to its net figure while D keeps its world cost, and the gap reverses."""
+    return public_cost_public_ownership() - world_resource_cost(fee, growth)
+
+
+def stake_rate_sensitivity(rates=(0.03, 0.05, 0.08, 0.10)):
+    """World economic cost and saving as the state's stake is discounted at r."""
+    c = public_cost_components()
+    stake = PUBLIC_SHARE * terminal_company_value()
+    out = []
+    for r in rates:
+        eco = world_resource_cost() - (stake / (1 + r) ** HORIZON - c["pv_stake_fleet"])
+        out.append(dict(rate=r, economic=eco, saving=world_cost_public_ownership() - eco))
+    return out
